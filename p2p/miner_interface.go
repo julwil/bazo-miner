@@ -46,9 +46,7 @@ func forwardBlockBrdcstToMiner() {
 	for {
 		block := <-BlockOut
 		toBrdcst := BuildPacket(BLOCK_BRDCST, block)
-		if len(minerBrdcstMsg) > 0 {
-			logger.Printf("Inside forwardBlockBrdcstToMiner len(minerBrdcstMsg) %v", len(minerBrdcstMsg))
-		}
+
 		minerBrdcstMsg <- toBrdcst
 	}
 }
@@ -74,20 +72,14 @@ func forwardVerifiedTxsBrdcstToMiner() {
 	}
 }
 
-func forwardBlockToMiner(p *peer, payload []byte) {
-	//	blockStashMutex.Lock()
-	//	var block *protocol.Block
-	//	block = block.Decode(payload)
-	//	storage.WriteToReceivedStash(block)
-	//	if !BlockAlreadyReceived(storage.ReadReceivedBlockStash(),block.Hash){
+func processBlockBrdcst(p *peer, payload []byte) {
 	if len(BlockIn) > 0 {
 		var block *protocol.Block
 		block = block.Decode(payload)
 		logger.Printf("Inside ForwardBlockToMiner --> len(BlockIn) = %v for block %x", len(BlockIn), block.Hash[0:8])
 	}
+
 	BlockIn <- payload
-	//	}
-	//	blockStashMutex.Unlock()
 }
 
 //Checks if Tx Is in the received stash. If true, we received the transaction with a request already.
