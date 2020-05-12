@@ -19,12 +19,28 @@ func incomingData() {
 //ReceivedBlockStash is a stash with all Blocks received such that we can prevent forking
 func processBlock(payload []byte) {
 
-	var block *protocol.Block
+	var block, closedBlock *protocol.Block
 	block = block.Decode(payload)
-	//Block already confirmed and validated
-	if storage.ReadClosedBlock(block.Hash) != nil {
-		logger.Printf("Received block (%x) has already been validated.\n", block.Hash[0:8])
-		return
+	closedBlock = storage.ReadClosedBlock(block.Hash)
+
+	logger.Printf("Received block:%v\n", block.String())
+
+	// We already received this block previously.
+	if closedBlock != nil {
+
+		// No updates were performed on the block. Nothing to do.
+		if closedBlock.NrUpdates == block.NrUpdates {
+			logger.Printf("Received block (%x) has already been validated.\n", block.Hash[0:8])
+
+			return
+		} else { // There has been an update on the block in the meantime. We need to replace the block.
+
+			// Then we have to replace the block in our storage.
+			storage.WriteClosedBlock(block)
+			logger.Printf("Replaced block:\n%v with:\n%v", closedBlock.String(), block.String())
+
+			return
+		}
 	}
 
 	//Append received Block to stash
