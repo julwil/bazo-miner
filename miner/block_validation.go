@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-//This function is split into block syntax/PoS check and actual state change
-//because there is the case that we might need to go fetch several blocks
+// This function is split into block syntax/PoS check and actual state change
+// because there is the case that we might need to go fetch several blocks
 // and have to check the blocks first before changing the state in the correct order.
 func validate(b *protocol.Block, initialSetup bool) error {
 

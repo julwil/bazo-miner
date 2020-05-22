@@ -55,10 +55,29 @@ func IsRootKey(hash [32]byte) bool {
 
 //Get all pubKeys involved in AccTx, FundsTx of a given block
 func GetTxPubKeys(block *protocol.Block) (txPubKeys [][32]byte) {
-	txPubKeys = GetAccTxPubKeys(block.AccTxData)
-	txPubKeys = append(txPubKeys, GetFundsTxPubKeys(block.FundsTxData)...)
+	var accTxs [][32]byte
+	var fundsTxs [][32]byte
 
-	return txPubKeys
+	for _, txHash := range append(block.AccTxData, block.FundsTxData...) {
+		var tx protocol.Transaction
+
+		tx = ReadClosedTx(txHash)
+		if tx == nil {
+			tx = ReadOpenTx(txHash)
+		}
+
+		// Upon deletion of a tx, we replace the original hash with the DeleteTx hash. We have to filter the by type.
+		switch tx.(type) {
+		case *protocol.AccTx:
+			accTxs = append(accTxs, txHash)
+		case *protocol.FundsTx:
+			fundsTxs = append(fundsTxs, txHash)
+		default: // In case we come across a DeleteTx or an unknown type.
+			continue
+		}
+	}
+
+	return append(GetAccTxPubKeys(accTxs), GetFundsTxPubKeys(fundsTxs)...)
 }
 
 //Get all pubKey involved in AccTx

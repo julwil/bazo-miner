@@ -29,8 +29,8 @@ type Block struct {
 	BloomFilter       *bloom.BloomFilter //8 byte
 	Height            uint32
 	Beneficiary       [32]byte
-	Aggregated        bool //Indicates if All transactions are aggregated with a boolean.
-	// ==> 177 bytes
+	Aggregated        bool   //Indicates if All transactions are aggregated with a boolean.
+	NrUpdates         uint16 // Indicates how many txs of this block were updated (deleted / replaced)
 
 	//Body
 	Nonce                          [8]byte
@@ -235,6 +235,7 @@ func (block *Block) Encode() []byte {
 		HashWithoutTx:                  block.HashWithoutTx,
 		PrevHashWithoutTx:              block.PrevHashWithoutTx,
 		Aggregated:                     block.Aggregated,
+		NrUpdates:                      block.NrUpdates,
 		Nonce:                          block.Nonce,
 		Timestamp:                      block.Timestamp,
 		MerkleRoot:                     block.MerkleRoot,
@@ -313,6 +314,7 @@ func (block Block) String() string {
 		"Timestamp: %v\n"+
 		"MerkleRoot: %x\n"+
 		"Beneficiary: %x\n"+
+		"Number of updates: %v\n"+
 		"Amount of fundsTx: %v --> %x\n"+
 		"Amount of accTx: %v --> %x\n"+
 		"Amount of configTx: %v --> %x\n"+
@@ -332,6 +334,7 @@ func (block Block) String() string {
 		block.Timestamp,
 		block.MerkleRoot[0:8],
 		block.Beneficiary[0:8],
+		block.NrUpdates,
 		block.NrFundsTx, block.FundsTxData,
 		block.NrAccTx, block.AccTxData,
 		block.NrConfigTx, block.ConfigTxData,
