@@ -143,7 +143,9 @@ func Start(args *startArgs, logger *log.Logger) error {
 		return err
 	}
 
-	miner.Init(validatorPubKey, multisigPubKey, &rootPrivKey.PublicKey, commPrivKey, rootCommPrivKey)
+	chamHashParams, err := crypto.GetOrCreateChamHashParamsFromFile("ChamHash" + args.walletFile)
+
+	miner.Init(validatorPubKey, multisigPubKey, &rootPrivKey.PublicKey, commPrivKey, rootCommPrivKey, chamHashParams)
 	return nil
 }
 
