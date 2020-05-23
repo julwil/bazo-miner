@@ -35,9 +35,9 @@ func TestBlockHash(t *testing.T) {
 
 	block := NewBlock(prevHash, height)
 
-	hash1 := block.HashBlock()
+	hash1 := block.Sha3Hash()
 
-	if !reflect.DeepEqual(hash1, block.HashBlock()) {
+	if !reflect.DeepEqual(hash1, block.Sha3Hash()) {
 		t.Errorf("Block hashing failed!")
 	}
 
@@ -47,9 +47,9 @@ func TestBlockHash(t *testing.T) {
 	block.PrevHash = prevHash
 	block.Height = height
 
-	hash2 := block.HashBlock()
+	hash2 := block.Sha3Hash()
 
-	if !reflect.DeepEqual(hash2, block.HashBlock()) {
+	if !reflect.DeepEqual(hash2, block.Sha3Hash()) {
 		t.Errorf("Block hashing failed!")
 	}
 }

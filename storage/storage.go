@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"github.com/julwil/bazo-miner/crypto"
 	"log"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ var (
 	logger                            *log.Logger
 	State                             = make(map[[32]byte]*protocol.Account)
 	RootKeys                          = make(map[[32]byte]*protocol.Account)
+	ChamHashParams                    *crypto.ChameleonHashParameters
 	txMemPool                         = make(map[[32]byte]protocol.Transaction)
 	txINVALIDMemPool                  = make(map[[32]byte]protocol.Transaction)
 	bootstrapReceivedMemPool          = make(map[[32]byte]protocol.Transaction)

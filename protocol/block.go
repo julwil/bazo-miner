@@ -20,17 +20,19 @@ const (
 
 type Block struct {
 	//Header
-	Header            byte
-	Hash              [32]byte
-	PrevHash          [32]byte
-	HashWithoutTx     [32]byte //valid hash once all tx are aggregated
-	PrevHashWithoutTx [32]byte //valid hash of ancestor once all tx are aggregated
-	NrElementsBF      uint16
-	BloomFilter       *bloom.BloomFilter //8 byte
-	Height            uint32
-	Beneficiary       [32]byte
-	Aggregated        bool   //Indicates if All transactions are aggregated with a boolean.
-	NrUpdates         uint16 // Indicates how many txs of this block were updated (deleted / replaced)
+	Header              byte
+	Hash                [32]byte
+	PrevHash            [32]byte
+	HashWithoutTx       [32]byte                         //valid hash once all tx are aggregated
+	PrevHashWithoutTx   [32]byte                         //valid hash of ancestor once all tx are aggregated
+	ChamHashCheckString *crypto.ChameleonHashCheckString // Check-string for chameleon hashing.
+	ChamHashParameters  *crypto.ChameleonHashParameters
+	NrElementsBF        uint16
+	BloomFilter         *bloom.BloomFilter //8 byte
+	Height              uint32
+	Beneficiary         [32]byte
+	Aggregated          bool   //Indicates if All transactions are aggregated with a boolean.
+	NrUpdates           uint16 // Indicates how many txs of this block were updated (deleted / replaced)
 
 	//Body
 	Nonce                          [8]byte
@@ -70,15 +72,19 @@ func NewBlock(prevHash [32]byte, height uint32) *Block {
 	return &newBlock
 }
 
-func (block *Block) HashBlock() [32]byte {
+func (block *Block) Sha3Hash() [32]byte {
 	if block == nil {
 		return [32]byte{}
 	}
+
+	// Merkle tree includes the hashes of all txs in this block
+	block.MerkleRoot = BuildMerkleTree(block).MerkleRoot()
 
 	blockHash := struct {
 		prevHash                       [32]byte
 		prevHashWithoutTx              [32]byte
 		timestamp                      int64
+		nonce                          [8]byte
 		merkleRoot                     [32]byte
 		beneficiary                    [32]byte
 		commitmentProof                [crypto.COMM_PROOF_LENGTH]byte
@@ -92,6 +98,7 @@ func (block *Block) HashBlock() [32]byte {
 		block.PrevHash,
 		block.PrevHashWithoutTx,
 		block.Timestamp,
+		block.Nonce,
 		block.MerkleRoot,
 		block.Beneficiary,
 		block.CommitmentProof,
@@ -234,6 +241,8 @@ func (block *Block) Encode() []byte {
 		PrevHash:                       block.PrevHash,
 		HashWithoutTx:                  block.HashWithoutTx,
 		PrevHashWithoutTx:              block.PrevHashWithoutTx,
+		ChamHashCheckString:            block.ChamHashCheckString,
+		ChamHashParameters:             block.ChamHashParameters,
 		Aggregated:                     block.Aggregated,
 		NrUpdates:                      block.NrUpdates,
 		Nonce:                          block.Nonce,
@@ -275,17 +284,19 @@ func (block *Block) EncodeHeader() []byte {
 	}
 
 	encoded := Block{
-		Header:            block.Header,
-		Hash:              block.Hash,
-		PrevHash:          block.PrevHash,
-		HashWithoutTx:     block.HashWithoutTx,
-		PrevHashWithoutTx: block.PrevHashWithoutTx,
-		NrConfigTx:        block.NrConfigTx,
-		NrElementsBF:      block.NrElementsBF,
-		BloomFilter:       block.BloomFilter,
-		Height:            block.Height,
-		Beneficiary:       block.Beneficiary,
-		Aggregated:        block.Aggregated,
+		Header:              block.Header,
+		Hash:                block.Hash,
+		PrevHash:            block.PrevHash,
+		HashWithoutTx:       block.HashWithoutTx,
+		PrevHashWithoutTx:   block.PrevHashWithoutTx,
+		ChamHashCheckString: block.ChamHashCheckString,
+		NrConfigTx:          block.NrConfigTx,
+		NrElementsBF:        block.NrElementsBF,
+		BloomFilter:         block.BloomFilter,
+		Height:              block.Height,
+		Beneficiary:         block.Beneficiary,
+		Aggregated:          block.Aggregated,
+		NrUpdates:           block.NrUpdates,
 	}
 
 	buffer := new(bytes.Buffer)
