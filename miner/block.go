@@ -58,8 +58,6 @@ func finalizeBlock(block *protocol.Block) error {
 		}
 	}
 
-	//Merkle tree includes the hashes of all txs in this block
-	block.MerkleRoot = protocol.BuildMerkleTree(block).MerkleRoot()
 	validatorAcc, err := storage.GetAccount(protocol.SerializeHashContent(validatorAccAddress))
 	if err != nil {
 		return err
@@ -74,9 +72,6 @@ func finalizeBlock(block *protocol.Block) error {
 	if err != nil {
 		return err
 	}
-
-	//Block hash with MerkleTree and therefore, including all transactions
-	partialHash := block.HashBlock()
 
 	//Block hash without MerkleTree and therefore, without any transactions
 	partialHashWithoutMerkleRoot := block.HashBlockWithoutMerkleRoot()
@@ -99,8 +94,6 @@ func finalizeBlock(block *protocol.Block) error {
 	block.Nonce = nonceBuf
 	block.Timestamp = nonce
 
-	//Put pieces together to get the final hash.
-	block.Hash = sha3.Sum256(append(nonceBuf[:], partialHash[:]...))
 	block.HashWithoutTx = sha3.Sum256(append(nonceBuf[:], partialHashWithoutMerkleRoot[:]...))
 
 	//This doesn't need to be hashed, because we already have the merkle tree taking care of consistency.
@@ -112,6 +105,17 @@ func finalizeBlock(block *protocol.Block) error {
 	block.NrDeleteTx = uint16(len(block.DeleteTxData))
 
 	copy(block.CommitmentProof[0:crypto.COMM_PROOF_LENGTH], commitmentProof[:])
+
+	// Use a chameleon hash for the block. Put check-string on the block.
+	chamHashParams := storage.ChamHashParams
+	chamHashCheckString := crypto.NewChameleonHashCheckString(chamHashParams.Q)
+	sha3Hash := block.Sha3Hash()
+	hashInput := sha3Hash[:]
+
+	block.ChamHashCheckString = chamHashCheckString
+	block.ChamHashParameters = chamHashParams // TODO: Block shouldn't have to store these. Put them in account.
+	block.Hash = crypto.ChameleonHash(chamHashParams, chamHashCheckString, &hashInput)
+
 	logger.Printf("-- End Finalization")
 
 	storeBlockByTxs(block)
@@ -213,4 +217,18 @@ func storeBlockByTxs(block *protocol.Block) {
 	for _, txHash := range block.DeleteTxData {
 		storage.WriteBlockHashByTxHash(txHash, block.Hash)
 	}
+}
+
+// After a block mutation we need to ensure hash consistency. To that end,
+// we use chameleon hashing to arrive at a hash collision for the old and new input.
+func finalizeBlockAfterMutation(block *protocol.Block, oldHashInput *[]byte) {
+	// Save old parameters
+	chamHashParams := storage.ChamHashParams
+	oldCheckString := block.ChamHashCheckString
+
+	// Rebuild hash on the updated block
+	sha3Hash := block.Sha3Hash()
+	newHashInput := sha3Hash[:]
+	newCheckString := crypto.GenerateChamHashCollision(chamHashParams, oldCheckString, oldHashInput, &newHashInput)
+	block.ChamHashCheckString = newCheckString
 }
