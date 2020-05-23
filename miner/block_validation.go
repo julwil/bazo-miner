@@ -127,7 +127,7 @@ func validate(b *protocol.Block, initialSetup bool) error {
 			logString = "During Validation of other"
 		}
 
-		logger.Printf("Validated block (%s block %v): %vState:\n%v", logString, b.Hash[0:8], block, getState())
+		logger.Printf("Validated block (%s block %v): %vState:\n%s", logString, b.Hash[0:8], block, getState())
 	}
 
 	return nil
@@ -137,13 +137,13 @@ func validate(b *protocol.Block, initialSetup bool) error {
 func preValidate(block *protocol.Block, initialSetup bool) error {
 
 	//Check state contains beneficiary.
-	acc, err := storage.GetAccount(block.Beneficiary)
+	beneficiaryAcc, err := storage.GetAccount(block.Beneficiary)
 	if err != nil {
 		return err
 	}
 
 	// Check if node is part of the validator set.
-	if !acc.IsStaking {
+	if !beneficiaryAcc.IsStaking {
 		return errors.New("Validator is not part of the validator set.")
 	}
 
@@ -165,10 +165,10 @@ func preValidate(block *protocol.Block, initialSetup bool) error {
 		return err
 	}
 
-	//First, initialize an RSA Public Key instance with the modulus of the proposer of the block (acc)
+	//First, initialize an RSA Public Key instance with the modulus of the proposer of the block (beneficiaryAcc)
 	//Second, check if the commitment proof of the proposed block can be verified with the public key
 	//Invalid if the commitment proof can not be verified with the public key of the proposer
-	commitmentPubKey, err := crypto.CreateRSAPubKeyFromBytes(acc.CommitmentKey)
+	commitmentPubKey, err := crypto.CreateRSAPubKeyFromBytes(beneficiaryAcc.CommitmentKey)
 	if err != nil {
 		return errors.New("Invalid commitment key in account.")
 	}
@@ -182,9 +182,9 @@ func preValidate(block *protocol.Block, initialSetup bool) error {
 	prevProofs := GetLatestProofs(activeParameters.numIncludedPrevProofs, block)
 
 	//PoS validation
-	if !initialSetup && !validateProofOfStake(getDifficulty(), prevProofs, block.Height, acc.Balance, block.CommitmentProof, block.Timestamp) {
+	if !initialSetup && !validateProofOfStake(getDifficulty(), prevProofs, block.Height, beneficiaryAcc.Balance, block.CommitmentProof, block.Timestamp) {
 		logger.Printf("____________________NONCE (%x) in block %x is problematic", block.Nonce, block.Hash[0:8])
-		logger.Printf("|  block.Height: %d, acc.Address %x, acc.txCount %v, acc.Balance %v, block.CommitmentProf: %x, block.Timestamp %v ", block.Height, acc.Address[0:8], acc.TxCnt, acc.Balance, block.CommitmentProof[0:8], block.Timestamp)
+		logger.Printf("|  block.Height: %d, beneficiaryAcc.Address %x, beneficiaryAcc.txCount %v, beneficiaryAcc.Balance %v, block.CommitmentProf: %x, block.Timestamp %v ", block.Height, beneficiaryAcc.Address[0:8], beneficiaryAcc.TxCnt, beneficiaryAcc.Balance, block.CommitmentProof[0:8], block.Timestamp)
 		logger.Printf("|_____________________________________________________")
 
 		return errors.New("The nonce is incorrect.")
@@ -197,11 +197,11 @@ func preValidate(block *protocol.Block, initialSetup bool) error {
 	}
 
 	//Check for minimum waiting time.
-	if block.Height-acc.StakingBlockHeight < uint32(activeParameters.WaitingMinimum) {
+	if block.Height-beneficiaryAcc.StakingBlockHeight < uint32(activeParameters.WaitingMinimum) {
 		return errors.New(
 			"The miner must wait a minimum amount of blocks before start validating. " +
 				"Block Height:" + fmt.Sprint(block.Height) + " - Height when started validating " +
-				string(acc.StakingBlockHeight) + " MinWaitingTime: " + string(activeParameters.WaitingMinimum))
+				string(beneficiaryAcc.StakingBlockHeight) + " MinWaitingTime: " + string(activeParameters.WaitingMinimum))
 	}
 
 	//Check if block contains a proof for two conflicting block hashes, else no proof provided.
@@ -216,8 +216,11 @@ func preValidate(block *protocol.Block, initialSetup bool) error {
 		}
 	}
 
-	//Merkle Tree validation
-	if block.Aggregated == false && protocol.BuildMerkleTree(block).MerkleRoot() != block.MerkleRoot {
+	sha3Hash := block.Sha3Hash()
+	hashInput := sha3Hash[:]
+	chamHash := crypto.ChameleonHash(block.ChamHashParameters, block.ChamHashCheckString, &hashInput)
+
+	if block.Aggregated == false && chamHash != block.Hash {
 		return errors.New("Merkle Root is incorrect.")
 	}
 
