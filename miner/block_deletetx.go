@@ -42,17 +42,26 @@ func handleTxDeletion(deleteTx *protocol.DeleteTx) error {
 		return errors.New(fmt.Sprintf("Can't find block of tx: %x", txToDeleteHash))
 	}
 
-	// Then we find the txToDeleteHash and replace it with deleteTxHash in the blockToUpdate
+	// Before we do any changes on the block, we need to store the original hash input before the mutation.
+	oldSha3Hash := blockToUpdate.Sha3Hash()
+	oldHashInput := oldSha3Hash[:]
+
+	// We also need to replace the hash of the tx to delete with the hash of the delete-tx
+	// from the block it was included in when tx was initially mined.
+	// First we get the block form the local storage where the tx was included in.
 	err := findReplaceTxInBlock(txToDeleteHash, deleteTxHash, blockToUpdate)
 	if err != nil {
 		return errors.New(fmt.Sprintf("\nRemoving \ntx: %x from \nblock: %x failed.", txToDeleteHash, blockToUpdate.Hash))
 	}
 
+	// We need to rebuild the block and make sure hash consistency is maintained.
+	finalizeBlockAfterMutation(blockToUpdate, &oldHashInput)
+
+	// Update the block in the local storage.
 	storage.DeleteOpenBlock(blockToUpdate.Hash)
 	storage.WriteClosedBlock(blockToUpdate)
 
 	go broadcastBlock(blockToUpdate)
-
 	logger.Printf("\nBroadcasted updated Block:\n%s", blockToUpdate.String())
 
 	return nil
@@ -106,7 +115,8 @@ func findReplaceTxInBlock(toFind [32]byte, toReplace [32]byte, block *protocol.B
 		// Funds
 		for i, fundsTxHash := range block.FundsTxData {
 			if fundsTxHash == toFind {
-				block.FundsTxData[i] = toReplace
+				block.FundsTxData = remove(block.FundsTxData, i) // TODO: removal is only a temp. solution. We need to swap the deleteTx and txToDelete in the slice.
+				block.NrFundsTx--
 				block.NrUpdates++
 
 				return nil
@@ -197,4 +207,12 @@ func fetchDeleteTxData(block *protocol.Block, deleteTxSlice []*protocol.DeleteTx
 	}
 
 	errChan <- nil
+}
+
+// Removes item at index i from the slice s.
+// Returns the updated slice.
+func remove(slice [][32]byte, i int) [][32]byte {
+	slice[len(slice)-1], slice[i] = slice[i], slice[len(slice)-1]
+
+	return slice[:len(slice)-1]
 }
