@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/gob"
 	"fmt"
+	"github.com/julwil/bazo-miner/crypto"
 )
 
 const (
@@ -21,14 +22,24 @@ type AccTx struct {
 	Sig               [64]byte
 	Contract          []byte
 	ContractVariables []ByteArray
+	ChamHashParams    *crypto.ChameleonHashParameters
 }
 
-func ConstrAccTx(header byte, fee uint64, address [64]byte, rootPrivKey *ecdsa.PrivateKey, contract []byte, contractVariables []ByteArray) (tx *AccTx, newAccAddress *ecdsa.PrivateKey, err error) {
+func ConstrAccTx(
+	header byte,
+	fee uint64,
+	address [64]byte,
+	rootPrivKey *ecdsa.PrivateKey,
+	contract []byte,
+	contractVariables []ByteArray,
+	chamHashParams *crypto.ChameleonHashParameters,
+) (tx *AccTx, newAccAddress *ecdsa.PrivateKey, err error) {
 	tx = new(AccTx)
 	tx.Header = header
 	tx.Fee = fee
 	tx.Contract = contract
 	tx.ContractVariables = contractVariables
+	tx.ChamHashParams = chamHashParams
 
 	if address != [64]byte{} {
 		copy(tx.PubKey[:], address[:])
@@ -96,11 +107,12 @@ func (tx *AccTx) Encode() []byte {
 	}
 
 	encoded := AccTx{
-		Header: tx.Header,
-		Issuer: tx.Issuer,
-		Fee:    tx.Fee,
-		PubKey: tx.PubKey,
-		Sig:    tx.Sig,
+		Header:         tx.Header,
+		Issuer:         tx.Issuer,
+		Fee:            tx.Fee,
+		PubKey:         tx.PubKey,
+		Sig:            tx.Sig,
+		ChamHashParams: tx.ChamHashParams,
 	}
 
 	buffer := new(bytes.Buffer)
@@ -120,9 +132,8 @@ func (tx *AccTx) TxFee() uint64 { return tx.Fee }
 
 func (tx *AccTx) Size() uint64 { return ACCTX_SIZE }
 
-func (tx *AccTx) Sender() [32]byte { return tx.Issuer}
-func (tx *AccTx) Receiver() [32]byte { return [32]byte{}}
-
+func (tx *AccTx) Sender() [32]byte   { return tx.Issuer }
+func (tx *AccTx) Receiver() [32]byte { return [32]byte{} }
 
 func (tx AccTx) String() string {
 	return fmt.Sprintf(

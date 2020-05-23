@@ -271,7 +271,16 @@ func initState() (initialBlock *protocol.Block, err error) {
 func accStateChange(txSlice []*protocol.AccTx) error {
 	for _, tx := range txSlice {
 		if tx.Header != 2 {
-			newAcc := protocol.NewAccount(tx.PubKey, tx.Issuer, 0, false, [crypto.COMM_KEY_LENGTH]byte{}, tx.Contract, tx.ContractVariables)
+			newAcc := protocol.NewAccount(
+				tx.PubKey,
+				tx.Issuer,
+				0,
+				false,
+				[crypto.COMM_KEY_LENGTH]byte{},
+				tx.Contract,
+				tx.ContractVariables,
+				tx.ChamHashParams,
+			)
 			newAccHash := newAcc.Hash()
 
 			acc, _ := storage.GetAccount(newAccHash)
